@@ -1,64 +1,92 @@
 #include "joystick_control.h"
 
-JoystickControl::JoystickControl(int x_pin, int y_pin, int button_pin)
-  : xPin(x_pin), yPin(y_pin), buttonPin(button_pin) {}
+JoystickControl* JoystickControl::instance = nullptr;
+
+JoystickControl::JoystickControl(int x_plus_pin, int x_minus_pin,
+                               int y_plus_pin, int y_minus_pin,
+                               int button_pin)
+    : xPlusPin(x_plus_pin), xMinusPin(x_minus_pin),
+      yPlusPin(y_plus_pin), yMinusPin(y_minus_pin),
+      buttonPin(button_pin) {
+  instance = this;
+}
 
 void JoystickControl::setup() {
+  pinMode(xPlusPin, INPUT_PULLUP);
+  pinMode(xMinusPin, INPUT_PULLUP);
+  pinMode(yPlusPin, INPUT_PULLUP);
+  pinMode(yMinusPin, INPUT_PULLUP);
   pinMode(buttonPin, INPUT_PULLUP);
 
-  // 타이머 인터럽트 설정
-  cli();  // 인터럽트 비활성화
-  TCCR1A = 0;  // 타이머1 초기화
-  TCCR1B = 0;
-  TCNT1 = 0;
+  attachInterrupt(digitalPinToInterrupt(xPlusPin), xPlusISR, FALLING);
+  attachInterrupt(digitalPinToInterrupt(xMinusPin), xMinusISR, FALLING);
+  attachInterrupt(digitalPinToInterrupt(yPlusPin), yPlusISR, FALLING);
+  attachInterrupt(digitalPinToInterrupt(yMinusPin), yMinusISR, FALLING);
+  attachInterrupt(digitalPinToInterrupt(buttonPin), buttonISR, FALLING);
+}
 
-  // 16MHz / 64(prescaler) = 250kHz
-  // 250kHz / 1000 = 250Hz (4ms)
-  OCR1A = 249;  // 비교값 설정
+void JoystickControl::readInput(int& x_direction, int& y_direction, bool& button_pressed) {
+  noInterrupts();
+  x_direction = 0;
+  if (x_plus_triggered) {
+    x_direction = 1;
+    x_plus_triggered = false;
+  }
+  if (x_minus_triggered) {
+    x_direction = -1;
+    x_minus_triggered = false;
+  }
 
-  TCCR1B |= (1 << WGM12);  // CTC 모드
-  TCCR1B |= (1 << CS11) | (1 << CS10);  // 64 prescaler
-  TIMSK1 |= (1 << OCIE1A);  // 타이머 비교 인터럽트 활성화
-  sei();  // 인터럽트 활성화
+  y_direction = 0;
+  if (y_plus_triggered) {
+    y_direction = 1;
+    y_plus_triggered = false;
+  }
+  if (y_minus_triggered) {
+    y_direction = -1;
+    y_minus_triggered = false;
+  }
+
+  button_pressed = this->button_pressed;
+  this->button_pressed = false;
+  interrupts();
 }
 
 void JoystickControl::update() {
-  // 조이스틱 입력 읽기
-  int x_value = analogRead(xPin) - 512;  // 중앙값 512 기준으로 오프셋
-  int y_value = analogRead(yPin) - 512;
-
-  // 데드존 적용
-  x_direction = (abs(x_value) > DEADZONE) ? (x_value > 0 ? 1 : -1) : 0;
-  y_direction = (abs(y_value) > DEADZONE) ? (y_value > 0 ? 1 : -1) : 0;
-
-  // 버튼 디바운스 처리
-  bool currentButtonState = digitalRead(buttonPin) == LOW;  // 풀업 저항 사용
-  unsigned long currentTime = millis();
-
-  if (currentButtonState != lastButtonState) {
-    lastButtonPress = currentTime;
-  }
-
-  if ((currentTime - lastButtonPress) > DEBOUNCE_DELAY) {
-    button_pressed = currentButtonState;
-  } else {
-    button_pressed = lastButtonState;
-  }
-
-  lastButtonState = currentButtonState;
+  // 인터럽트에서 호출되는 메서드
+  // 현재는 추가적인 처리가 필요하지 않음
 }
 
-void JoystickControl::readInput(int& x_dir, int& y_dir, bool& btn_pressed) {
-  // 인터럽트에서 업데이트된 값을 읽어옴
-  x_dir = x_direction;
-  y_dir = y_direction;
-  btn_pressed = button_pressed;
-}
-
-// 타이머 인터럽트 핸들러
-ISR(TIMER1_COMPA_vect) {
-  static JoystickControl* instance = nullptr;
+void JoystickControl::xPlusISR() {
   if (instance) {
-    instance->update();
+    instance->x_plus_triggered = true;
+  }
+}
+
+void JoystickControl::xMinusISR() {
+  if (instance) {
+    instance->x_minus_triggered = true;
+  }
+}
+
+void JoystickControl::yPlusISR() {
+  if (instance) {
+    instance->y_plus_triggered = true;
+  }
+}
+
+void JoystickControl::yMinusISR() {
+  if (instance) {
+    instance->y_minus_triggered = true;
+  }
+}
+
+void JoystickControl::buttonISR() {
+  if (instance) {
+    unsigned long current_time = millis();
+    if (current_time - instance->lastButtonPress > instance->DEBOUNCE_DELAY) {
+      instance->button_pressed = true;
+      instance->lastButtonPress = current_time;
+    }
   }
 }
