@@ -1,16 +1,16 @@
 /*
-x_plus 제외하고 잘 되는 거 확인 완료.
-왜 안되는지는 확인 필요
-/*
+13번 위치는 문제있음.
+제외하고 9 11 15 17 19 사용 필요.
+*/
 
 #include "limit_switch.h"
 
 // 리밋 스위치 핀
 const int LX_P = 9;
 const int LX_M = 11;
-const int LY_P = 13;
-const int LY_M = 15;
-const int LZ = 17;
+const int LY_P = 15;
+const int LY_M = 17;
+const int LZ = 19;
 
 // 객체 생성
 LimitSwitch lx_p(LX_P);

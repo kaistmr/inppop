@@ -1,6 +1,8 @@
 /*
-y축 모터 제외하고 잘 움직인다. 왜인지는 아직 판단 못함
-/*
+데이터 시트 다 뒤져봤는데도, 모르겠지만 일단 모터드라이버에서 위에것들만 작동함.
+즉 현재로서는 dc 모터는 최대 2개까지 가능.
+l298n 따로 더 쓰면 더 쓸 수는 있음.
+*/
 
 #include <Servo.h>
 
@@ -10,9 +12,9 @@ const int X1 = 36;
 const int X2 = 38;
 
 // Y축 모터 핀
-const int YS = 46;
-const int Y1 = 42;
-const int Y2 = 44;
+const int YS = 47;
+const int Y1 = 43;
+const int Y2 = 45;
 
 // Z축 모터 핀
 const int ZS = 41;
@@ -77,7 +79,7 @@ void stopAllMotors() {
 }
 
 void loop() {
-
+  moveMotor(YS, Y1, Y2, 1);
   /*
   if (Serial.available()) {
     char cmd = Serial.read();
