@@ -1,3 +1,7 @@
+/*
+작동되는거 확인
+/*
+
 // 거리 센서 핀
 const int TRIG_PIN = 2;
 const int ECHO_PIN = 3;

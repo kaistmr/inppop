@@ -5,20 +5,13 @@
 
 class LimitSwitch {
 public:
-  LimitSwitch(int x_limit_pin, int y_limit_pin);
+  LimitSwitch(int pin);
   void setup();
-  bool isXLimitTriggered();
-  bool isYLimitTriggered();
+  bool isLimitTriggered();
 
 private:
-  int xLimitPin;
-  int yLimitPin;
-  volatile bool xLimitTriggered = false;
-  volatile bool yLimitTriggered = false;
-
-  static void xLimitISR();
-  static void yLimitISR();
-  static LimitSwitch* instance;
+  int pin;
+  bool triggered;
 };
 
 #endif

@@ -1,32 +1,52 @@
-// X축 리밋 스위치 핀
-const int X_LIMIT_PLUS = 9;
-const int X_LIMIT_MINUS = 11;
+/*
+x_plus 제외하고 잘 되는 거 확인 완료.
+왜 안되는지는 확인 필요
+/*
 
-// Y축 리밋 스위치 핀
-const int Y_LIMIT_PLUS = 13;
-const int Y_LIMIT_MINUS = 15;
+#include "limit_switch.h"
+
+// 리밋 스위치 핀
+const int LX_P = 9;
+const int LX_M = 11;
+const int LY_P = 13;
+const int LY_M = 15;
+const int LZ = 17;
+
+// 객체 생성
+LimitSwitch lx_p(LX_P);
+LimitSwitch lx_m(LX_M);
+LimitSwitch ly_p(LY_P);
+LimitSwitch ly_m(LY_M);
+LimitSwitch lz(LZ);
 
 void setup() {
-  Serial.begin(9600);
-
-  // X축 리밋 스위치 설정
-  pinMode(X_LIMIT_PLUS, INPUT_PULLUP);
-  pinMode(X_LIMIT_MINUS, INPUT_PULLUP);
-
-  // Y축 리밋 스위치 설정
-  pinMode(Y_LIMIT_PLUS, INPUT_PULLUP);
-  pinMode(Y_LIMIT_MINUS, INPUT_PULLUP);
-
+  Serial.begin(115200);
   Serial.println("리밋 스위치 테스트 시작");
-  Serial.println("리밋 스위치 상태가 0이면 눌린 상태입니다.");
+
+  // 리밋 스위치 초기화
+  lx_p.setup();
+  lx_m.setup();
+  ly_p.setup();
+  ly_m.setup();
+  lz.setup();
 }
 
 void loop() {
-  // 리밋 스위치 상태 출력
-  Serial.print("X+:"); Serial.print(digitalRead(X_LIMIT_PLUS));
-  Serial.print(" X-:"); Serial.print(digitalRead(X_LIMIT_MINUS));
-  Serial.print(" Y+:"); Serial.print(digitalRead(Y_LIMIT_PLUS));
-  Serial.print(" Y-:"); Serial.println(digitalRead(Y_LIMIT_MINUS));
+  // 각 리밋 스위치 상태 확인
+  bool x_plus = lx_p.isLimitTriggered();
+  bool x_minus = lx_m.isLimitTriggered();
+  bool y_plus = ly_p.isLimitTriggered();
+  bool y_minus = ly_m.isLimitTriggered();
+  bool z = lz.isLimitTriggered();
 
-  delay(100);
+  // 상태 출력
+  Serial.println("\n=== 리밋 스위치 상태 ===");
+  Serial.print("X+ : "); Serial.println(x_plus ? "ON" : "OFF");
+  Serial.print("X- : "); Serial.println(x_minus ? "ON" : "OFF");
+  Serial.print("Y+ : "); Serial.println(y_plus ? "ON" : "OFF");
+  Serial.print("Y- : "); Serial.println(y_minus ? "ON" : "OFF");
+  Serial.print("Z  : "); Serial.println(z ? "ON" : "OFF");
+  Serial.println("=====================");
+
+  delay(100);  // 100ms 간격으로 상태 업데이트
 }
