@@ -12,9 +12,9 @@ const int X1 = 36;
 const int X2 = 38;
 
 // Y축 모터 핀
-const int YS = 47;
-const int Y1 = 43;
-const int Y2 = 45;
+const int YS = 46;
+const int Y1 = 42;
+const int Y2 = 44;
 
 // Z축 모터 핀
 const int ZS = 41;
@@ -79,8 +79,6 @@ void stopAllMotors() {
 }
 
 void loop() {
-  moveMotor(YS, Y1, Y2, 1);
-  /*
   if (Serial.available()) {
     char cmd = Serial.read();
 
@@ -130,5 +128,5 @@ void loop() {
         Serial.println("모든 모터 정지");
         break;
     }
-  } */
+  }
 }

@@ -15,10 +15,6 @@ const int JY_P = 27;
 const int JY_M = 29;
 const int BTN = 31;
 
-// 통신 핀
-const int COMM_IN = 3;   // DigitalRead
-const int COMM_OUT = 5;  // DigitalWrite
-
 // 리밋 스위치 핀
 const int LX_P = 9;
 const int LX_M = 11;
@@ -44,11 +40,12 @@ const int G_CLOSE = 50;
 
 // 모터 제어 상수
 const int MOTOR_SPEED = 200;  // 모터 속도 (0-255)
-const unsigned long MOTOR_TIMEOUT = 10000;  // 모터 타임아웃 (ms)
+const unsigned long MOTOR_TIMEOUT = 5000;  // 모터 타임아웃 (ms)
 
-// 통신 관련 상수
-const unsigned long COMM_DELAY = 3000;  // 통신 딜레이 (ms)
-unsigned long lastCommTime = 0;         // 마지막 통신 시간
+// 시리얼 통신 상수
+const char CMD_START = 's';  // 게임 시작
+const char CMD_STOP = 'e';   // 게임 종료
+const char CMD_RESET = 'r';  // 리셋
 
 // 객체 생성
 MotorControl L_M(L_MOTOR);
@@ -64,7 +61,6 @@ Servo Grip;
 GameState state = WAIT;
 bool btn_pressed = false;
 bool is_start = false;
-bool is_gripping = false;
 
 void setup() {
   Serial.begin(115200);
@@ -82,11 +78,6 @@ void setup() {
   ly_m.setup();
   lz.setup();
 
-  // 통신 핀 설정
-  pinMode(COMM_IN, INPUT);
-  pinMode(COMM_OUT, OUTPUT);
-  digitalWrite(COMM_OUT, LOW);
-
   // 조이스틱 핀 설정
   pinMode(BTN, INPUT_PULLUP);
   pinMode(JX_P, INPUT_PULLUP);
@@ -99,27 +90,18 @@ void setup() {
   Grip.write(G_OPEN);
 
   Serial.println("초기화 완료!");
+  Serial.println("사용 가능한 명령어:");
+  Serial.println("s: 게임 시작");
+  Serial.println("e: 게임 종료");
+  Serial.println("r: 시스템 리셋");
 }
 
 void loop() {
-  // 통신 처리
-  if (state == WAIT) {
-    if (digitalRead(COMM_IN) == HIGH) {
-      state = PLAY;
-      digitalWrite(COMM_OUT, HIGH);
-      Serial.println("게임 시작!");
-    }
+  // 시리얼 명령어 처리
+  if (Serial.available() > 0) {
+    char cmd = Serial.read();
+    processCommand(cmd);
   }
-  else if (state == DONE) {
-    if (millis() - lastCommTime >= COMM_DELAY) {
-      if (digitalRead(COMM_IN) == HIGH) {
-        state = PLAY;
-        digitalWrite(COMM_OUT, HIGH);
-        Serial.println("게임 시작!");
-      }
-    }
-  }
-
   // 버튼 상태 확인 (LOW가 눌림 상태)
   bool btn_state = !digitalRead(BTN);
   if (btn_state && !btn_pressed) {
@@ -144,8 +126,6 @@ void loop() {
         moveEnd();
         btn_pressed = false;
         state = DONE;
-        digitalWrite(COMM_OUT, LOW);
-        lastCommTime = millis();
         Serial.println("게임 종료!");
       }
       break;
@@ -155,6 +135,30 @@ void loop() {
       Serial.println("새 게임 준비 완료");
       state = WAIT;
       is_start = false;
+      break;
+  }
+}
+
+void processCommand(char cmd) {
+  switch (cmd) {
+    case CMD_START:
+      if (state == WAIT) {
+        state = PLAY;
+        Serial.println("게임 시작!");
+      }
+      break;
+
+    case CMD_STOP:
+      if (state == PLAY) {
+        state = DONE;
+        Serial.println("게임 강제 종료!");
+      }
+      break;
+
+    case CMD_RESET:
+      state = WAIT;
+      is_start = false;
+      Serial.println("시스템 리셋!");
       break;
   }
 }
@@ -256,7 +260,7 @@ void gamePlay() {
 }
 
 void gripMove() {
-  Serial.println("그리퍼 동작 시작");
+  Serial.println("gripp!!");
   unsigned long startTime = millis();
 
   // Z축 하강
@@ -266,7 +270,7 @@ void gripMove() {
   }
   Z_M.stop();
 
-  // 그리퍼 동작 (열기-닫기)
+  // 그리퍼 동작
   Grip.write(G_OPEN);
   delay(G_ACT);
   Grip.write(G_CLOSE);
@@ -279,16 +283,4 @@ void gripMove() {
     delay(10);
   }
   Z_M.stop();
-
-  // 끝점으로 이동
-  moveEnd();
-
-  // 그리퍼 동작 (열기-닫기)
-  Grip.write(G_OPEN);
-  delay(G_ACT);
-  Grip.write(G_CLOSE);
-  delay(G_ACT);
-
-  // 원점으로 이동
-  moveStart();
 }
