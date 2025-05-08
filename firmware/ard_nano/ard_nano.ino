@@ -39,6 +39,15 @@ enum GameState {
   FINISHED    // 게임 종료
 };
 
+// 거리 센서 상수
+const int DISTANCE_THRESHOLD = 10;  // 거리 변화 감지 임계값 (mm)
+const int COIN_DELAY = 1000;       // 동전 투입 후 대기 시간 (ms)
+
+// 통신 관련 상수
+const unsigned long COMM_DEBOUNCE = 50;  // 디바운스 시간 (ms)
+unsigned long lastCommTime = 0;          // 마지막 통신 시간
+bool lastCommState = false;              // 마지막 통신 상태
+
 // 객체 생성
 DistanceSensor distanceSensor(DISTANCE_SENSOR_PIN, DISTANCE_TRIG_PIN);
 MP3Player mp3Player(MP3_RX, MP3_TX);
@@ -48,6 +57,9 @@ int lastDistance = 0;
 bool coinInserted = false;
 
 void setup() {
+  Serial.begin(115200);
+  Serial.println("게임 시스템 초기화 중...");
+
   // 거리 센서 및 MP3 플레이어 초기화
   distanceSensor.setup();
   mp3Player.setup();
@@ -59,43 +71,65 @@ void setup() {
 
   // 대기 상태 음악 재생 시작
   mp3Player.playWaitingMusic();
+
+  Serial.println("초기화 완료!");
+  Serial.println("동전 투입 대기 중...");
 }
 
 void loop() {
   // 거리 센서 값 읽기
   int currentDistance = distanceSensor.readDistance();
 
+  // 통신 상태 확인 (디바운싱 적용)
+  bool currentCommState = digitalRead(COMM_RECEIVE);
+  unsigned long currentTime = millis();
+
+  if (currentCommState != lastCommState) {
+    lastCommTime = currentTime;
+  }
+
   switch (currentState) {
     case WAITING:
       // 동전 투입 감지
       if (!coinInserted && distanceSensor.isCoinInserted(currentDistance, lastDistance)) {
         coinInserted = true;
-        delay(1000); // 동전이 완전히 들어갈 때까지 대기
+        Serial.println("동전 투입 감지!");
+        delay(COIN_DELAY); // 동전이 완전히 들어갈 때까지 대기
         startGame();
       }
       lastDistance = currentDistance;
       break;
 
     case PLAYING:
-      // Mega로부터 게임 종료 신호 확인
-      if (digitalRead(COMM_RECEIVE) == LOW) {
-        currentState = FINISHED;
-        digitalWrite(COMM_SEND, LOW);
-        coinInserted = false;
+      // Mega로부터 게임 종료 신호 확인 (디바운싱 적용)
+      if ((currentTime - lastCommTime) > COMM_DEBOUNCE) {
+        if (currentCommState == LOW) {
+          currentState = FINISHED;
+          digitalWrite(COMM_SEND, LOW);
+          coinInserted = false;
+          Serial.println("게임 종료 신호 수신!");
+        }
       }
       break;
 
     case FINISHED:
-      if (digitalRead(COMM_RECEIVE) == LOW) {
-        currentState = WAITING;
-        mp3Player.playWaitingMusic();
+      // Mega로부터 새 게임 시작 신호 확인
+      if ((currentTime - lastCommTime) > COMM_DEBOUNCE) {
+        if (currentCommState == LOW) {
+          currentState = WAITING;
+          mp3Player.playWaitingMusic();
+          Serial.println("새 게임 준비 완료!");
+        }
       }
       break;
   }
+
+  lastCommState = currentCommState;
 }
 
 void startGame() {
   currentState = PLAYING;
   digitalWrite(COMM_SEND, HIGH);
   mp3Player.playGameMusic();
+  Serial.println("게임 시작!");
 }
