@@ -38,12 +38,12 @@ enum GameState {
 
 // 그리퍼 상수
 const unsigned long G_DELAY = 5000;  // 5초
-const unsigned long G_ACT = 100;     // 0.1초
-const int G_OPEN = 140;
-const int G_CLOSE = 50;
+const unsigned long G_ACT = 1000;     // 1초
+const int G_OPEN = 50;
+const int G_CLOSE = 140;
 
 // 모터 제어 상수
-const int MOTOR_SPEED = 200;  // 모터 속도 (0-255)
+const int MOTOR_SPEED = 170;  // 모터 속도 (0-255)
 const unsigned long MOTOR_TIMEOUT = 10000;  // 모터 타임아웃 (ms)
 
 // 통신 관련 상수
@@ -141,7 +141,6 @@ void loop() {
       gamePlay();
       if (btn_pressed) {
         gripMove();
-        moveEnd();
         btn_pressed = false;
         state = DONE;
         digitalWrite(COMM_OUT, LOW);
@@ -205,7 +204,7 @@ void moveEnd() {
   while((!x_reached || !y_reached) && (millis() - startTime < MOTOR_TIMEOUT)) {
     // X축 이동 (X- 리밋 스위치로)
     if (!x_reached) {
-      if (lx_m.isLimitTriggered()) {
+      if (!digitalRead(LX_M)) {
         x_reached = true;
         L_M.stop();
         R_M.stop();
@@ -217,7 +216,7 @@ void moveEnd() {
 
     // Y축 이동 (Y+ 리밋 스위치로)
     if (!y_reached) {
-      if (ly_p.isLimitTriggered()) {
+      if (!digitalRead(LY_P)) {
         y_reached = true;
         L_M.stop();
         R_M.stop();
@@ -261,9 +260,7 @@ void gripMove() {
 
   // Z축 하강
   Z_M.move(CW);
-  while(!lz.isLimitTriggered() && (millis() - startTime < G_DELAY)) {
-    delay(10);
-  }
+  delay(3000);
   Z_M.stop();
 
   // 그리퍼 동작 (열기-닫기)
@@ -274,11 +271,11 @@ void gripMove() {
 
   // Z축 상승
   startTime = millis();
-  Z_M.move(CCW);
-  while(!lz.isLimitTriggered() && (millis() - startTime < G_DELAY)) {
-    delay(10);
+  while(!digitalRead(LZ)) {
+    Z_M.move(CCW);
   }
   Z_M.stop();
+  delay(10);
 
   // 끝점으로 이동
   moveEnd();
@@ -288,7 +285,4 @@ void gripMove() {
   delay(G_ACT);
   Grip.write(G_CLOSE);
   delay(G_ACT);
-
-  // 원점으로 이동
-  moveStart();
 }
