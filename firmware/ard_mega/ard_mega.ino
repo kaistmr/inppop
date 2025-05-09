@@ -64,7 +64,6 @@ Servo Grip;
 GameState state = WAIT;
 bool btn_pressed = false;
 bool is_start = false;
-bool is_gripping = false;
 
 void setup() {
   Serial.begin(115200);
