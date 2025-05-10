@@ -1,108 +1,144 @@
 #include <SoftwareSerial.h>
 
-SoftwareSerial mySerial(6, 12); // RX, TX
+SoftwareSerial mySerial(6, 12);
 char data[10] = {0x7E,0xFF,0x06,0x00,0x00,0x00,0x00,0x00,0x00,0xEF};
+//               SOF  VI   DL   CMD  ACK  DH   DL   CHL  CHH  EOF
+// CMD is command
+// DH DL is different for command
+// CHL CHH is checksum low / high
 
-void buildChecksum() {
+char decode[16] = {'0','1','2','3','4','5','6','7','8','9','A','B','C','D','E','F'};
+char decoded[20]={};
+char rxbuffer[11];;
+
+void decodefunction(){
+  for(int i=0;i<20;i++){
+    if(i%2 == 0){
+      decoded[i] = decode[(data[(int)(i/2)] & 0xF0) >> 4];
+      Serial.print(" ");
+    }else{
+      decoded[i] = decode[(data[(int)(i/2)] & 0x0F)];
+    }
+    Serial.print(decoded[i]);
+  }
+  Serial.println("");
+}
+void decodeRX(){
+  Serial.print("from module : ");
+  for(int i=2;i<22;i++){
+    if(i%2 == 0){
+      decoded[i] = decode[(rxbuffer[(int)(i/2)] & 0xF0) >> 4];
+      Serial.print(" ");
+    }else{
+      decoded[i] = decode[(rxbuffer[(int)(i/2)] & 0x0F)];
+    }
+    Serial.print(decoded[i]);
+  }
+  Serial.println("");
+}
+void buildChecksum(){
   uint16_t sum = 0;
+
   for (uint8_t i = 1; i <= 6; ++i)
     sum += (uint8_t)data[i];
+
   uint16_t chk = 0xFFFF - sum + 1;
+
   data[7] = chk >> 8;
-  data[8] = chk & 0xFF;
+  data[8] = chk & 0xFF;   
 }
 
-void sendCommand() {
-  for(int i=0; i<10; i++) {
+void playmusicnum(int musicnum){
+  Serial.print("play music : ");
+  data[3] = 0x0F;      //command for play music [DL, 0~255] from file [DH, 0~10]
+  data[5] = 0x01;      //DH, file select
+  data[6] = musicnum;  //DL, music select in file
+  buildChecksum();
+  decodefunction();
+  for(int i=0;i<10;i++){
     mySerial.print(data[i]);
   }
 }
-
-void playMusic(int folder, int track) {
-  data[3] = 0x0F;      // play music command
-  data[5] = folder;    // folder number
-  data[6] = track;     // track number
+void folderset(){
+  Serial.print("folder set : ");
+  data[3] = 0x0F;      //command for folder repeat
+  data[5] = 0x01;
+  data[6] = 0x01;
   buildChecksum();
-  sendCommand();
+  decodefunction();
+  for(int i=0;i<10;i++){
+    mySerial.print(data[i]);
+  }
 }
-
-void setVolume(int volume) {
-  data[3] = 0x06;      // volume command
+void folderrepeat(){
+  Serial.print("folder repeat : ");
+  data[3] = 0x08;
   data[5] = 0x00;
-  data[6] = volume;
+  data[6] = 0x01;
   buildChecksum();
-  sendCommand();
+  decodefunction();
+  for(int i=0;i<10;i++){
+    mySerial.print(data[i]);
+  }
 }
-
-void reset() {
-  data[3] = 0x0C;      // reset command
+void playback(){
+  Serial.print("playback : ");
+  data[3] = 0x0D;
   data[5] = 0x00;
   data[6] = 0x00;
   buildChecksum();
-  sendCommand();
+  decodefunction();
+  for(int i=0;i<10;i++){
+    mySerial.print(data[i]);
+  }
+}
+void reset(){
+  Serial.print("module reset : ");
+  data[3] = 0x0C;
+  data[5] = 0x00;
+  data[6] = 0x00;
+  buildChecksum();
+  decodefunction();
+  for(int i=0;i<10;i++){
+    mySerial.print(data[i]);
+  }
+}
+void volumeset(int volume){
+  Serial.print("volume set : ");
+  data[3] = 0x06;    //command for folder repeat
+  data[5] = 0x00;    //DH, file select
+  data[6] = volume;  //DL, music select in file
+  buildChecksum();
+  decodefunction();
+  for(int i=0;i<10;i++){
+    mySerial.print(data[i]);
+  }
 }
 
 void setup() {
   Serial.begin(9600);
   mySerial.begin(9600);
-
-  Serial.println("DFPlayer Mini 테스트 시작");
-
-  // 모듈 초기화
   reset();
   delay(1000);
-
-  // 볼륨 설정
-  setVolume(10);
+  volumeset(10);
   delay(1000);
-
-  Serial.println("테스트 준비 완료");
-  Serial.println("1: 폴더 1의 첫 번째 곡 재생");
-  Serial.println("2: 폴더 2의 첫 번째 곡 재생");
-  Serial.println("v: 볼륨 증가");
-  Serial.println("V: 볼륨 감소");
-  Serial.println("r: 리셋");
+  //folderset();
+  //delay(1000);
+  playmusicnum(1);
+  delay(1000);
+  //folderrepeat();
+  //delay(1000);
+  //playback();
 }
 
-int volume = 10;
+int rxpoint = 0;
 
 void loop() {
-  if (Serial.available()) {
-    char cmd = Serial.read();
-
-    switch(cmd) {
-      case '1':
-        playMusic(1, 1);
-        Serial.println("폴더 1의 첫 번째 곡 재생");
-        break;
-
-      case '2':
-        playMusic(2, 1);
-        Serial.println("폴더 2의 첫 번째 곡 재생");
-        break;
-
-      case 'v':
-        if (volume < 30) {
-          volume++;
-          setVolume(volume);
-          Serial.print("볼륨 증가: ");
-          Serial.println(volume);
-        }
-        break;
-
-      case 'V':
-        if (volume > 0) {
-          volume--;
-          setVolume(volume);
-          Serial.print("볼륨 감소: ");
-          Serial.println(volume);
-        }
-        break;
-
-      case 'r':
-        reset();
-        Serial.println("모듈 리셋");
-        break;
+  if(mySerial.available()){
+    rxbuffer[rxpoint++] = mySerial.read();
+    if(rxpoint == 11){
+      rxpoint = 0;
+      decodeRX();
     }
   }
 }

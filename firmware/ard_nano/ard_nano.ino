@@ -17,16 +17,20 @@
 - 다시 동전 대기 시퀀스 돌입
 */
 
-#include "distance_sensor.h"
-#include "mp3_player.h"
+#include <SoftwareSerial.h>
 
-// 거리 센서 핀
-const int DISTANCE_SENSOR_PIN = A7;
-const int DISTANCE_TRIG_PIN = 2;
+const int DISTANCE_SENSOR_PIN = 2;
 
-// MP3 모듈 핀
-const int MP3_RX = 6;
-const int MP3_TX = 12;
+SoftwareSerial mySerial(6, 12);
+char data[10] = {0x7E,0xFF,0x06,0x00,0x00,0x00,0x00,0x00,0x00,0xEF};
+//               SOF  VI   DL   CMD  ACK  DH   DL   CHL  CHH  EOF
+// CMD is command
+// DH DL is different for command
+// CHL CHH is checksum low / high
+
+char decode[16] = {'0','1','2','3','4','5','6','7','8','9','A','B','C','D','E','F'};
+char decoded[20]={};
+char rxbuffer[11];;
 
 // 통신 핀
 const int COMM_SEND = 8;    // Mega로 신호 송신
@@ -39,97 +43,167 @@ enum GameState {
   FINISHED    // 게임 종료
 };
 
-// 거리 센서 상수
-const int DISTANCE_THRESHOLD = 10;  // 거리 변화 감지 임계값 (mm)
-const int COIN_DELAY = 1000;       // 동전 투입 후 대기 시간 (ms)
-
-// 통신 관련 상수
-const unsigned long COMM_DEBOUNCE = 50;  // 디바운스 시간 (ms)
-unsigned long lastCommTime = 0;          // 마지막 통신 시간
-bool lastCommState = false;              // 마지막 통신 상태
-
-// 객체 생성
-DistanceSensor distanceSensor(DISTANCE_SENSOR_PIN, DISTANCE_TRIG_PIN);
-MP3Player mp3Player(MP3_RX, MP3_TX);
-
 GameState currentState = WAITING;
-int lastDistance = 0;
+
 bool coinInserted = false;
 
-void setup() {
-  Serial.begin(115200);
-  Serial.println("게임 시스템 초기화 중...");
+void decodefunction(){
+  for(int i=0;i<20;i++){
+    if(i%2 == 0){
+      decoded[i] = decode[(data[(int)(i/2)] & 0xF0) >> 4];
+      Serial.print(" ");
+    }else{
+      decoded[i] = decode[(data[(int)(i/2)] & 0x0F)];
+    }
+    Serial.print(decoded[i]);
+  }
+  Serial.println("");
+}
 
-  // 거리 센서 및 MP3 플레이어 초기화
-  distanceSensor.setup();
-  mp3Player.setup();
+void decodeRX(){
+  Serial.print("from module : ");
+  for(int i=2;i<22;i++){
+    if(i%2 == 0){
+      decoded[i] = decode[(rxbuffer[(int)(i/2)] & 0xF0) >> 4];
+      Serial.print(" ");
+    }else{
+      decoded[i] = decode[(rxbuffer[(int)(i/2)] & 0x0F)];
+    }
+    Serial.print(decoded[i]);
+  }
+  Serial.println("");
+}
 
-  // 통신 핀 설정
+void buildChecksum(){
+  uint16_t sum = 0;
+
+  for (uint8_t i = 1; i <= 6; ++i)
+    sum += (uint8_t)data[i];
+
+  uint16_t chk = 0xFFFF - sum + 1;
+
+  data[7] = chk >> 8;
+  data[8] = chk & 0xFF;
+}
+
+void playmusicnum(int musicnum){
+  Serial.print("play music : ");
+  data[3] = 0x0F;      //command for play music [DL, 0~255] from file [DH, 0~10]
+  data[5] = 0x01;      //DH, file select
+  data[6] = musicnum;  //DL, music select in file
+  buildChecksum();
+  decodefunction();
+  for(int i=0;i<10;i++){
+    mySerial.print(data[i]);
+  }
+}
+
+void folderset(){
+  Serial.print("folder set : ");
+  data[3] = 0x0F;      //command for folder repeat
+  data[5] = 0x01;
+  data[6] = 0x01;
+  buildChecksum();
+  decodefunction();
+  for(int i=0;i<10;i++){
+    mySerial.print(data[i]);
+  }
+}
+
+void folderrepeat(){
+  Serial.print("folder repeat : ");
+  data[3] = 0x08;
+  data[5] = 0x00;
+  data[6] = 0x01;
+  buildChecksum();
+  decodefunction();
+  for(int i=0;i<10;i++){
+    mySerial.print(data[i]);
+  }
+}
+
+void playback(){
+  Serial.print("playback : ");
+  data[3] = 0x0D;
+  data[5] = 0x00;
+  data[6] = 0x00;
+  buildChecksum();
+  decodefunction();
+  for(int i=0;i<10;i++){
+    mySerial.print(data[i]);
+  }
+}
+
+void reset(){
+  Serial.print("module reset : ");
+  data[3] = 0x0C;
+  data[5] = 0x00;
+  data[6] = 0x00;
+  buildChecksum();
+  decodefunction();
+  for(int i=0;i<10;i++){
+    mySerial.print(data[i]);
+  }
+}
+
+void volumeset(int volume){
+  Serial.print("volume set : ");
+  data[3] = 0x06;    //command for folder repeat
+  data[5] = 0x00;    //DH, file select
+  data[6] = volume;  //DL, music select in file
+  buildChecksum();
+  decodefunction();
+  for(int i=0;i<10;i++){
+    mySerial.print(data[i]);
+  }
+}
+
+void setup()
+{
+  Serial.begin(9600);
+  mySerial.begin(9600);
+  Serial.println("System Rebooting...");
+
   pinMode(COMM_SEND, OUTPUT);
   pinMode(COMM_RECEIVE, INPUT);
   digitalWrite(COMM_SEND, LOW);
 
-  // 대기 상태 음악 재생 시작
-  mp3Player.playWaitingMusic();
+  // 동전 감지 핀 설정
+  pinMode(DISTANCE_SENSOR_PIN, INPUT);
 
-  Serial.println("초기화 완료!");
-  Serial.println("동전 투입 대기 중...");
+  reset();
+  delay(1000);
+  volumeset(10);
+  delay(1000);
+  //folderset();
+  //delay(1000);
+  playmusicnum(1);
+  delay(1000);
+  //folderrepeat();
+  //delay(1000);
+  //playback();
 }
+
+int rxpoint = 0;
 
 void loop() {
-  // 거리 센서 값 읽기
-  int currentDistance = distanceSensor.readDistance();
-
-  // 통신 상태 확인 (디바운싱 적용)
-  bool currentCommState = digitalRead(COMM_RECEIVE);
-  unsigned long currentTime = millis();
-
-  if (currentCommState != lastCommState) {
-    lastCommTime = currentTime;
+  if(mySerial.available()){
+    Serial.print("Distance:");
+    Serial.println(!digitalRead(DISTANCE_SENSOR_PIN));
+    /*
+    Serial.print("COMR:");
+    Serial.println(digitalRead(COMM_RECEIVE));
+    digitalWrite(COMM_SEND, HIGH);
+    Serial.print("COMS:");
+    Serial.println(digitalRead(COMM_SEND));
+    digitalWrite(COMM_SEND, LOW);
+    Serial.print("COMS:");
+    Serial.println(digitalRead(COMM_SEND));
+    */
+    rxbuffer[rxpoint++] = mySerial.read();
+    if(rxpoint == 11){
+      rxpoint = 0;
+      decodeRX();
+    }
   }
-
-  switch (currentState) {
-    case WAITING:
-      // 동전 투입 감지
-      if (!coinInserted && distanceSensor.isCoinInserted(currentDistance, lastDistance)) {
-        coinInserted = true;
-        Serial.println("동전 투입 감지!");
-        delay(COIN_DELAY); // 동전이 완전히 들어갈 때까지 대기
-        startGame();
-      }
-      lastDistance = currentDistance;
-      break;
-
-    case PLAYING:
-      // Mega로부터 게임 종료 신호 확인 (디바운싱 적용)
-      if ((currentTime - lastCommTime) > COMM_DEBOUNCE) {
-        if (currentCommState == LOW) {
-          currentState = FINISHED;
-          digitalWrite(COMM_SEND, LOW);
-          coinInserted = false;
-          Serial.println("게임 종료 신호 수신!");
-        }
-      }
-      break;
-
-    case FINISHED:
-      // Mega로부터 새 게임 시작 신호 확인
-      if ((currentTime - lastCommTime) > COMM_DEBOUNCE) {
-        if (currentCommState == LOW) {
-          currentState = WAITING;
-          mp3Player.playWaitingMusic();
-          Serial.println("새 게임 준비 완료!");
-        }
-      }
-      break;
-  }
-
-  lastCommState = currentCommState;
-}
-
-void startGame() {
-  currentState = PLAYING;
-  digitalWrite(COMM_SEND, HIGH);
-  mp3Player.playGameMusic();
-  Serial.println("게임 시작!");
 }
