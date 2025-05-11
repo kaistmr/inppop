@@ -1,5 +1,5 @@
-# FFirmware
-최종 사용 코드 : 'ard_nano.ino', 'mega.ino'
+# Firmware
+최종 사용 코드 : `ard_nano.ino`, `mega.ino`
 
 ## Arduino nano
 ### Distance Sensing
