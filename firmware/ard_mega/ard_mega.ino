@@ -3,9 +3,9 @@
 #include <Servo.h>
 
 // 모터 핀
-const int L_MOTOR[3] = {40, 36, 38};
-const int R_MOTOR[3] = {46, 42, 44};
-const int Z_MOTOR[3] = {41, 37, 39};
+const int L_MOTOR[3] = {46, 42, 44};
+const int R_MOTOR[3] = {41, 37, 39};
+const int Z_MOTOR[3] = {47, 43, 45};
 const int GRIP_PIN = 34;
 
 // 조이스틱 핀
@@ -26,15 +26,15 @@ const int LY_P = 15;
 const int LY_M = 17;
 const int LZ = 19;
 
-#define CW 1
-#define CCW 0
-
 // 게임 상태
 enum GameState {
   WAIT,    // 대기 상태
   PLAY,    // 게임 진행 중
   DONE     // 게임 종료
 };
+
+#define CW 1
+#define CCW 0
 
 // 그리퍼 상수
 const unsigned long G_DELAY = 5000;  // 5초
@@ -43,7 +43,8 @@ const int G_OPEN = 50;
 const int G_CLOSE = 140;
 
 // 모터 제어 상수
-const int MOTOR_SPEED = 170;  // 모터 속도 (0-255)
+const int MOTOR_SPEED = 255;  // 모터 속도 (0-255)
+const int zMotor_SPEED = 100;
 const unsigned long MOTOR_TIMEOUT = 10000;  // 모터 타임아웃 (ms)
 
 // 통신 관련 상수
@@ -65,9 +66,18 @@ GameState state = WAIT;
 bool btn_pressed = false;
 bool is_start = false;
 
+int coinstate;
+
+void coininserted_ISR()
+{
+  coinstate++;
+}
+
 void setup() {
   Serial.begin(115200);
   Serial.println("로봇 제어 시스템 초기화 중...");
+
+  attachInterrupt(digitalPinToInterrupt(COMM_IN), coininserted_ISR, RISING);
 
   // 모터 및 조이스틱 초기화
   L_M.setup();
@@ -142,6 +152,9 @@ void loop() {
         gripMove();
         btn_pressed = false;
         state = DONE;
+        coinstate--;
+        digitalWrite(COMM_OUT, HIGH);
+        delay(100);  // 짧은 펄스
         digitalWrite(COMM_OUT, LOW);
         lastCommTime = millis();
         Serial.println("게임 종료!");
@@ -157,21 +170,21 @@ void loop() {
   }
 }
 
-void moveStart() {
+void moveToHome() {
   unsigned long startTime = millis();
   bool x_reached = false;
   bool y_reached = false;
 
   while((!x_reached || !y_reached) && (millis() - startTime < MOTOR_TIMEOUT)) {
-    // X축 이동 (X+ 리밋 스위치로)
+    // X축 이동 (X- 리밋 스위치로)
     if (!x_reached) {
-      if (lx_p.isLimitTriggered()) {
+      if (lx_m.isLimitTriggered()) {
         x_reached = true;
         L_M.stop();
         R_M.stop();
       } else {
-        L_M.move(CCW);
-        R_M.move(CCW);
+        L_M.move(CW);
+        R_M.move(CW);
       }
     }
 
@@ -192,44 +205,15 @@ void moveStart() {
 
   L_M.stop();
   R_M.stop();
+}
+
+void moveStart() {
+  moveToHome();
   is_start = true;
 }
 
 void moveEnd() {
-  unsigned long startTime = millis();
-  bool x_reached = false;
-  bool y_reached = false;
-
-  while((!x_reached || !y_reached) && (millis() - startTime < MOTOR_TIMEOUT)) {
-    // X축 이동 (X- 리밋 스위치로)
-    if (!x_reached) {
-      if (!digitalRead(LX_M)) {
-        x_reached = true;
-        L_M.stop();
-        R_M.stop();
-      } else {
-        L_M.move(CW);
-        R_M.move(CW);
-      }
-    }
-
-    // Y축 이동 (Y+ 리밋 스위치로)
-    if (!y_reached) {
-      if (!digitalRead(LY_P)) {
-        y_reached = true;
-        L_M.stop();
-        R_M.stop();
-      } else {
-        L_M.move(CCW);
-        R_M.move(CW);
-      }
-    }
-
-    delay(10);
-  }
-
-  L_M.stop();
-  R_M.stop();
+  moveToHome();
 }
 
 void gamePlay() {

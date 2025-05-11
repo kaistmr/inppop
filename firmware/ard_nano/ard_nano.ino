@@ -1,22 +1,3 @@
-/*
-코드 구조
-1. 2개의 상태가 존재: 동전 대기 / 게임 진행
-2. 동전 대기:
-- mp3 모듈에서 1번 폴더 속 노래를 랜덤하게 반복 재생
-- distance 센서 인식 중
-- 신호를 송신 받는 8번 핀이 LOW로 설정
-3. 동전 대기 -> 게임 진행
-- distance 센서 인식(D2) ; 인터럽트
-- D8을 HIGH로 설정
-- 만약 D7에 값이 HIGH가 들어오면 게임 진행 시퀀스로 돌입
-4. 게임 진행:
-- mp3 모듈에서 2번 폴더 속 노래를 랜덤하게 반복 재생
-- 지속적으로 D7 핀에서 신호 수신(defalt: HIGH)
-5. 게임 진행 -> 동전 대기
-- D7 핀에 LOW 신호가 수신되면 D8 핀의 값도 LOW로 설정
-- 다시 동전 대기 시퀀스 돌입
-*/
-
 #include <SoftwareSerial.h>
 
 const int DISTANCE_SENSOR_PIN = 2;
@@ -34,18 +15,11 @@ char rxbuffer[11];;
 
 // 통신 핀
 const int COMM_SEND = 8;    // Mega로 신호 송신
-const int COMM_RECEIVE = 7; // Mega로부터 신호 수신
-
-// 게임 상태
-enum GameState {
-  WAITING,    // 대기 상태
-  PLAYING,    // 게임 진행 중
-  FINISHED    // 게임 종료
-};
-
-GameState currentState = WAITING;
+const int COMM_RECEIVE = 3; // Mega로부터 신호 수신
 
 bool coinInserted = false;
+
+int gamestate = 0;
 
 void decodefunction(){
   for(int i=0;i<20;i++){
@@ -86,47 +60,11 @@ void buildChecksum(){
   data[8] = chk & 0xFF;
 }
 
-void playmusicnum(int musicnum){
+void playmusicnum(int filenum, int musicnum){
   Serial.print("play music : ");
   data[3] = 0x0F;      //command for play music [DL, 0~255] from file [DH, 0~10]
-  data[5] = 0x01;      //DH, file select
+  data[5] = filenum;      //DH, file select
   data[6] = musicnum;  //DL, music select in file
-  buildChecksum();
-  decodefunction();
-  for(int i=0;i<10;i++){
-    mySerial.print(data[i]);
-  }
-}
-
-void folderset(){
-  Serial.print("folder set : ");
-  data[3] = 0x0F;      //command for folder repeat
-  data[5] = 0x01;
-  data[6] = 0x01;
-  buildChecksum();
-  decodefunction();
-  for(int i=0;i<10;i++){
-    mySerial.print(data[i]);
-  }
-}
-
-void folderrepeat(){
-  Serial.print("folder repeat : ");
-  data[3] = 0x08;
-  data[5] = 0x00;
-  data[6] = 0x01;
-  buildChecksum();
-  decodefunction();
-  for(int i=0;i<10;i++){
-    mySerial.print(data[i]);
-  }
-}
-
-void playback(){
-  Serial.print("playback : ");
-  data[3] = 0x0D;
-  data[5] = 0x00;
-  data[6] = 0x00;
   buildChecksum();
   decodefunction();
   for(int i=0;i<10;i++){
@@ -158,11 +96,35 @@ void volumeset(int volume){
   }
 }
 
+void coin_ISR(){
+  if(!gamestate)
+  {
+    playmusicnum(1, random(1,133));
+  }
+  gamestate++;
+  digitalWrite(COMM_SEND, HIGH);
+  delayMicroseconds(1000);
+  digitalWrite(COMM_SEND, LOW);
+}
+
+void coinused_ISR()
+{
+  gamestate--;
+  if(!gamestate)
+  {
+    playmusicnum(2, random(1,83));
+  }
+}
+
 void setup()
 {
   Serial.begin(9600);
+  randomSeed(analogRead(0));
   mySerial.begin(9600);
   Serial.println("System Rebooting...");
+
+  attachInterrupt(digitalPinToInterrupt(DISTANCE_SENSOR_PIN), coin_ISR, FALLING);
+  attachInterrupt(digitalPinToInterrupt(COMM_RECEIVE), coinused_ISR, RISING);
 
   pinMode(COMM_SEND, OUTPUT);
   pinMode(COMM_RECEIVE, INPUT);
@@ -173,37 +135,42 @@ void setup()
 
   reset();
   delay(1000);
-  volumeset(10);
-  delay(1000);
-  //folderset();
-  //delay(1000);
-  playmusicnum(1);
-  delay(1000);
-  //folderrepeat();
-  //delay(1000);
-  //playback();
+  volumeset(1);
 }
 
 int rxpoint = 0;
 
 void loop() {
-  if(mySerial.available()){
-    Serial.print("Distance:");
-    Serial.println(!digitalRead(DISTANCE_SENSOR_PIN));
-    /*
-    Serial.print("COMR:");
-    Serial.println(digitalRead(COMM_RECEIVE));
-    digitalWrite(COMM_SEND, HIGH);
-    Serial.print("COMS:");
-    Serial.println(digitalRead(COMM_SEND));
-    digitalWrite(COMM_SEND, LOW);
-    Serial.print("COMS:");
-    Serial.println(digitalRead(COMM_SEND));
-    */
-    rxbuffer[rxpoint++] = mySerial.read();
-    if(rxpoint == 11){
-      rxpoint = 0;
-      decodeRX();
+  if(gamestate)
+  {
+    if(mySerial.available())
+    {
+      rxbuffer[rxpoint++] = mySerial.read();
+      if(rxpoint == 11)
+      {
+        rxpoint = 1;
+        decodeRX();
+        delay(500);
+        playmusicnum(1, random(1,133));
+      }
     }
   }
+  else
+  {
+    if(mySerial.available())
+    {
+      rxbuffer[rxpoint++] = mySerial.read();
+      if(rxpoint == 11)
+      {
+        rxpoint = 1;
+        decodeRX();
+        delay(500);
+        playmusicnum(2, random(1,83));
+      }
+    }
+  }
+  Serial.print(digitalRead(COMM_SEND));
+  Serial.print(digitalRead(COMM_RECEIVE));
+  Serial.print(gamestate);
+  Serial.println(digitalRead(DISTANCE_SENSOR_PIN));
 }

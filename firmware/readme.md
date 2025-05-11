@@ -59,12 +59,12 @@
 - 예제 코드: `./test/joystick_button_test`
 
 ## Signal Pin(mega and nano)
-- 핀(nano): D8(DigitalWrite)과 D7(DigitalRead)을 사용
+- 핀(nano): D8(DigitalWrite)과 D3(DigitalRead)을 사용
 - 핀(mega): D3(DigitalRead)와 D5(DigitalWrite)을 사용
-- nano의 D8과 mega의 D3, nano의 D7과 mega의 D5는 서로 이어져 있음.
+- nano의 D8과 mega의 D3, nano의 D3과 mega의 D5는 서로 이어져 있음.
 - 작동:
   - 동전이 투입된 이후 게임 시작 시퀀스 돌입시, arduino nano의 D8의 state를 1로 세팅.
   - Arduino mega의 D3 쪽에서 이를 인식 후, Mega의 D5을 1로 세팅하여 게임을 진행.
-  - 게임이 끝나면 mega의 D5 값이 0으로 바뀌며, mini의 D7핀이 연결된 핀이 0 값을 read.
-  - D7 핀에서 0 값이 인식되면 D8의 값을 0으로 내리며 하나의 과정 종료.
+  - 게임이 끝나면 mega의 D5 값이 0으로 바뀌며, mini의 D3핀이 연결된 핀이 0 값을 read.
+  - D3 핀에서 0 값이 인식되면 D8의 값을 0으로 내리며 하나의 과정 종료.
   - 이를 반복
