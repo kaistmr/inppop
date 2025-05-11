@@ -1,5 +1,5 @@
-# Firmware
-이 공간은 아두이노 2개를 제어할 코드가 올라갈 예정입니다.
+# FFirmware
+최종 사용 코드 : 'ard_nano.ino', 'mega.ino'
 
 ## Arduino nano
 ### Distance Sensing
