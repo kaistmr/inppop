@@ -1,30 +1,36 @@
+// core xy에서 x축 y축으로 변경
+// 하나하나 체크하면서 이동관련해서 코드 짜야 함.
+// 기존의 코드를 이용해서 코드 참고해서 짜도 좋을듯?
+
 #include "motor_control.h"
 #include "limit_switch.h"
 #include <Servo.h>
 
 // 모터 핀
-const int L_MOTOR[3] = {46, 42, 44};
+const int L_MOTOR[3] = {40, 36, 38};
 const int R_MOTOR[3] = {41, 37, 39};
 const int Z_MOTOR[3] = {47, 43, 45};
-const int GRIP_PIN = 34;
+const int GRIP_PIN = 35;
 
 // 조이스틱 핀
-const int JX_P = 23;
-const int JX_M = 25;
-const int JY_P = 27;
-const int JY_M = 29;
+const int JX_P = 25;
+const int JX_M = 23;
+const int JY_P = 29;
+const int JY_M = 27;
 const int BTN = 31;
 
-// 통신 핀
-const int COMM_IN = 3;   // DigitalRead
-const int COMM_OUT = 5;  // DigitalWrite
-
 // 리밋 스위치 핀
-const int LX_P = 9;
+const int LX_P = 21;
 const int LX_M = 11;
-const int LY_P = 15;
-const int LY_M = 17;
+const int LY_P = 17;
+const int LY_M = 15;
 const int LZ = 19;
+
+const int COMM_OUT = 5;
+const int COMM_IN = 2;
+
+#define CW 1
+#define CCW 0
 
 // 게임 상태
 enum GameState {
@@ -33,23 +39,16 @@ enum GameState {
   DONE     // 게임 종료
 };
 
-#define CW 1
-#define CCW 0
-
 // 그리퍼 상수
 const unsigned long G_DELAY = 5000;  // 5초
-const unsigned long G_ACT = 1000;     // 1초
-const int G_OPEN = 50;
-const int G_CLOSE = 140;
+const unsigned long G_ACT = 2000;     // 1.5초
+const int G_OPEN = 100;
+const int G_CLOSE = 80;
 
 // 모터 제어 상수
-const int MOTOR_SPEED = 255;  // 모터 속도 (0-255)
-const int zMotor_SPEED = 100;
-const unsigned long MOTOR_TIMEOUT = 10000;  // 모터 타임아웃 (ms)
-
-// 통신 관련 상수
-const unsigned long COMM_DELAY = 3000;  // 통신 딜레이 (ms)
-unsigned long lastCommTime = 0;         // 마지막 통신 시간
+const int MOTOR_SPEED = 200;  // 모터 속도 (0-255)
+const int GRIP_SPEED = 100;  // z축 모터 속도 (0-255)
+const unsigned long MOTOR_TIMEOUT = 5000;  // 모터 타임아웃 (ms)
 
 // 객체 생성
 MotorControl L_M(L_MOTOR);
@@ -65,117 +64,19 @@ Servo Grip;
 GameState state = WAIT;
 bool btn_pressed = false;
 bool is_start = false;
+int gamecoin = 0;
 
-int coinstate;
-
-void coininserted_ISR()
-{
-  coinstate++;
+void COIN_ISR() {
+  gamecoin++;
+  digitalWrite(COMM_OUT, HIGH);
 }
 
-void setup() {
-  Serial.begin(115200);
-  Serial.println("로봇 제어 시스템 초기화 중...");
-
-  attachInterrupt(digitalPinToInterrupt(COMM_IN), coininserted_ISR, RISING);
-
-  // 모터 및 조이스틱 초기화
-  L_M.setup();
-  R_M.setup();
-  Z_M.setup();
-
-  // 리밋 스위치 초기화
-  lx_p.setup();
-  lx_m.setup();
-  ly_p.setup();
-  ly_m.setup();
-  lz.setup();
-
-  // 통신 핀 설정
-  pinMode(COMM_IN, INPUT);
-  pinMode(COMM_OUT, OUTPUT);
-  digitalWrite(COMM_OUT, LOW);
-
-  // 조이스틱 핀 설정
-  pinMode(BTN, INPUT_PULLUP);
-  pinMode(JX_P, INPUT_PULLUP);
-  pinMode(JX_M, INPUT_PULLUP);
-  pinMode(JY_P, INPUT_PULLUP);
-  pinMode(JY_M, INPUT_PULLUP);
-
-  // 그리퍼 초기화
-  Grip.attach(GRIP_PIN);
-  Grip.write(G_OPEN);
-
-  Serial.println("초기화 완료!");
-}
-
-void loop() {
-  // 통신 처리
-  if (state == WAIT) {
-    if (digitalRead(COMM_IN) == HIGH) {
-      state = PLAY;
-      digitalWrite(COMM_OUT, HIGH);
-      Serial.println("게임 시작!");
-    }
-  }
-  else if (state == DONE) {
-    if (millis() - lastCommTime >= COMM_DELAY) {
-      if (digitalRead(COMM_IN) == HIGH) {
-        state = PLAY;
-        digitalWrite(COMM_OUT, HIGH);
-        Serial.println("게임 시작!");
-      }
-    }
-  }
-
-  // 버튼 상태 확인 (LOW가 눌림 상태)
-  bool btn_state = !digitalRead(BTN);
-  if (btn_state && !btn_pressed) {
-    btn_pressed = true;
-    L_M.stop();
-    R_M.stop();
-    Z_M.stop();
-  }
-
-  switch (state) {
-    case WAIT:
-      if (!is_start) {
-        moveStart();
-        Serial.println("초기 위치로 이동 완료");
-      }
-      break;
-
-    case PLAY:
-      gamePlay();
-      if (btn_pressed) {
-        gripMove();
-        btn_pressed = false;
-        state = DONE;
-        coinstate--;
-        digitalWrite(COMM_OUT, HIGH);
-        delay(100);  // 짧은 펄스
-        digitalWrite(COMM_OUT, LOW);
-        lastCommTime = millis();
-        Serial.println("게임 종료!");
-      }
-      break;
-
-    case DONE:
-      moveStart();
-      Serial.println("새 게임 준비 완료");
-      state = WAIT;
-      is_start = false;
-      break;
-  }
-}
-
-void moveToHome() {
-  unsigned long startTime = millis();
+void moveHome() {
   bool x_reached = false;
   bool y_reached = false;
 
-  while((!x_reached || !y_reached) && (millis() - startTime < MOTOR_TIMEOUT)) {
+  while(!x_reached || !y_reached)
+  {
     // X축 이동 (X- 리밋 스위치로)
     if (!x_reached) {
       if (lx_m.isLimitTriggered()) {
@@ -183,37 +84,27 @@ void moveToHome() {
         L_M.stop();
         R_M.stop();
       } else {
-        L_M.move(CW);
-        R_M.move(CW);
+        L_M.move(-1, MOTOR_SPEED);
+        R_M.move(-1, MOTOR_SPEED);
       }
     }
 
     // Y축 이동 (Y+ 리밋 스위치로)
     if (!y_reached) {
-      if (ly_p.isLimitTriggered()) {
+      if (ly_m.isLimitTriggered()) {
         y_reached = true;
         L_M.stop();
         R_M.stop();
       } else {
-        L_M.move(CCW);
-        R_M.move(CW);
+        L_M.move(-1, MOTOR_SPEED);
+        R_M.move(1, MOTOR_SPEED);
       }
     }
-
     delay(10);
   }
 
   L_M.stop();
   R_M.stop();
-}
-
-void moveStart() {
-  moveToHome();
-  is_start = true;
-}
-
-void moveEnd() {
-  moveToHome();
 }
 
 void gamePlay() {
@@ -233,39 +124,114 @@ void gamePlay() {
   int l_dir = jx + jy;
   int r_dir = jx - jy;
 
-  L_M.move(l_dir);
-  R_M.move(r_dir);
+  L_M.move(l_dir, MOTOR_SPEED);
+  R_M.move(r_dir, MOTOR_SPEED);
 }
 
 void gripMove() {
-  Serial.println("그리퍼 동작 시작");
-  unsigned long startTime = millis();
-
   // Z축 하강
-  Z_M.move(CW);
-  delay(3000);
-  Z_M.stop();
+  analogWrite(47, 255);
+  digitalWrite(43, HIGH);
+  digitalWrite(45, LOW);
+  delay(1000);
+  analogWrite(47, 0);
+  digitalWrite(43, HIGH);
+  digitalWrite(45, LOW);
+  delay(1000);
 
-  // 그리퍼 동작 (열기-닫기)
+  // 그리퍼 동작
   Grip.write(G_OPEN);
   delay(G_ACT);
   Grip.write(G_CLOSE);
   delay(G_ACT);
 
   // Z축 상승
-  startTime = millis();
-  while(!digitalRead(LZ)) {
-    Z_M.move(CCW);
+  while(!lz.isLimitTriggered())
+  {
+    analogWrite(47, 255);
+    digitalWrite(43, LOW);
+    digitalWrite(45, HIGH);
   }
-  Z_M.stop();
-  delay(10);
+}
 
-  // 끝점으로 이동
-  moveEnd();
+void setup() {
+  Serial.begin(115200);
+  Serial.println("로봇 제어 시스템 초기화 중...");
 
-  // 그리퍼 동작 (열기-닫기)
+  attachInterrupt(digitalPinToInterrupt(COMM_IN), COIN_ISR, RISING);
+
+  // 모터 및 조이스틱 초기화
+  L_M.setup();
+  R_M.setup();
+  Z_M.setup();
+
+  // 리밋 스위치 초기화
+  lx_p.setup();
+  lx_m.setup();
+  ly_p.setup();
+  ly_m.setup();
+  lz.setup();
+
+  // 조이스틱 핀 설정
+  pinMode(BTN, INPUT_PULLUP);
+  pinMode(JX_P, INPUT_PULLUP);
+  pinMode(JX_M, INPUT_PULLUP);
+  pinMode(JY_P, INPUT_PULLUP);
+  pinMode(JY_M, INPUT_PULLUP);
+
+  // 그리퍼 초기화
+  Grip.attach(GRIP_PIN);
   Grip.write(G_OPEN);
-  delay(G_ACT);
-  Grip.write(G_CLOSE);
-  delay(G_ACT);
+  delay(1000);
+
+  Serial.println("초기화 완료!");
+  gamecoin = 0;
+  delay(1000);
+}
+
+void loop() {
+  Serial.print("gamecoin: ");
+  Serial.println(gamecoin);
+
+  // 버튼 상태 확인 (LOW가 눌림 상태)
+  bool btn_state = !digitalRead(BTN);
+  if (btn_state && !btn_pressed) {
+    btn_pressed = true;
+    L_M.stop();
+    R_M.stop();
+    Z_M.stop();
+  }
+
+  if(gamecoin > 0) {
+    state = PLAY;
+  }
+
+  switch (state) {
+    case WAIT:
+      if (!is_start) {
+        moveHome();
+        Serial.println("초기 위치로 이동 완료");
+      }
+      break;
+
+    case PLAY:
+      gamePlay();
+      if (btn_pressed) {
+        gripMove();
+        moveHome();
+        btn_pressed = false;
+        state = DONE;
+        Serial.println("게임 종료!");
+      }
+      break;
+
+    case DONE:
+      moveHome();
+      Serial.println("새 게임 준비 완료");
+      state = WAIT;
+      is_start = false;
+      gamecoin--;
+      digitalWrite(COMM_OUT, LOW);
+      break;
+  }
 }

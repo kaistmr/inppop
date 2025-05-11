@@ -12,18 +12,18 @@ void MotorControl::setup() {
   isEnabled = true;
 }
 
-void MotorControl::move(int direction) {
+void MotorControl::move(int direction, int vel) {
   if (!isEnabled) return;
 
   if (direction > 0) {
     digitalWrite(dir1Pin, HIGH);
     digitalWrite(dir2Pin, LOW);
-    analogWrite(enablePin, 255);
+    analogWrite(enablePin, vel);
   }
   else if (direction < 0) {
     digitalWrite(dir2Pin, HIGH);
     digitalWrite(dir1Pin, LOW);
-    analogWrite(enablePin, 255);
+    analogWrite(enablePin, vel);
   }
   else {
     stop();

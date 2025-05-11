@@ -4,15 +4,15 @@
 
 // 모터 핀
 const int L_MOTOR[3] = {40, 36, 38};
-const int R_MOTOR[3] = {46, 42, 44};
-const int Z_MOTOR[3] = {41, 37, 39};
+const int R_MOTOR[3] = {41, 37, 39};
+const int Z_MOTOR[3] = {47, 43, 45};
 const int GRIP_PIN = 34;
 
 // 조이스틱 핀
-const int JX_P = 23;
-const int JX_M = 25;
-const int JY_P = 27;
-const int JY_M = 29;
+const int JX_P = 25;
+const int JX_M = 23;
+const int JY_P = 29;
+const int JY_M = 27;
 const int BTN = 31;
 
 // 리밋 스위치 핀

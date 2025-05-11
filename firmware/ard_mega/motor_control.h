@@ -8,7 +8,7 @@ public:
   MotorControl(const int pins[3]);  // [enable, dir1, dir2]
 
   void setup();
-  void move(int direction);
+  void move(int direction, int vel);
   void stop();
 
 private:

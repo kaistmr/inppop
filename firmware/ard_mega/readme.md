@@ -25,7 +25,6 @@
 - 원점 이동하라는 flag: `gohome`
 
 ## logic(loop)
-interrupt(push to grip)
 if(`grip`)
 if(`gohome`)
 joy to move
@@ -40,7 +39,7 @@ joy to move
 - 전달 받은 값 (x+, x-, y+, y-) 에 대한 값을 모터에 적용해서 움직임 진행
 
 ### push to grip
-- push 버튼의 값이 인식되면(interrupt), 모든 움직임 멈추기, `grip` flag 를 변화
+- push 버튼의 값이 인식되면, 모든 움직임 멈추기, `grip` flag 를 변화
 
 ### gohome
 - `gohome` flag 값이 1이면 실행하는 거
