@@ -2,7 +2,8 @@
 
 const int X_MOTOR[3] = {41, 37, 39};
 const int Y_MOTOR[3] = {40, 36, 38};
-const int Z_MOTOR[3] = {47, 43, 45};
+// const int Z_MOTOR[3] = {47, 43, 45};
+const int Z_PIN = 47;
 const int GRIP_PIN = 35;
 
 // 조이스틱 핀
@@ -25,11 +26,15 @@ const int COMM_IN = 2;
 
 // 모터 제어
 const int MOTOR_SPEED = 200;  // 모터 속도 (0-255)
-const int GRIP_SPEED = 255;  // z축 모터 속도 (0-255)
+const int GRIP_SPEED = 220;  // z축 모터 속도 (0-255)
 const unsigned long MOTOR_TIMEOUT = 5000;  // 모터 타임아웃 (ms)
 const int GRIP_OPEN = 80; // 그리퍼 열림 값
 const int GRIP_CLOSE = 100; // 그리퍼 닫는 값
+const int Z_DOWN = 1900;
+const int Z_UP = 1000;
+const int Z_STOP = 1450;
 Servo grip;
+Servo z_axis;
 
 // flag 설정
 int state = 0; //0: 대기, 1: 움직임
@@ -95,8 +100,9 @@ void setup()
 
   MotorSetup(X_MOTOR);
   MotorSetup(Y_MOTOR);
-  MotorSetup(Z_MOTOR);
+  // MotorSetup(Z_MOTOR);
   grip.attach(GRIP_PIN);
+  z_axis.attach(Z_PIN);
 
   pinMode(BTN, INPUT_PULLUP);
   pinMode(LX_P, INPUT_PULLUP);
@@ -113,7 +119,7 @@ void setup()
   pinMode(COMM_IN, INPUT);
 
   grip.write(GRIP_CLOSE);
-
+  z_axis.write(Z_STOP);
   delay(5000);
   gamecoin = 0;
 }
@@ -127,21 +133,27 @@ void loop()
 
   if(reachlimit(BTN))
   {
+    z_axis.writeMicroseconds(Z_DOWN);
     MotorMove(X_MOTOR, 0, MOTOR_SPEED);
     MotorMove(Y_MOTOR, 0, MOTOR_SPEED);
-    MotorMove(Z_MOTOR, -1, GRIP_SPEED);
-    delay(1000);
-    MotorMove(Z_MOTOR, 0, 0);
+  //  MotorMove(Z_MOTOR, -1, GRIP_SPEED);
+    delay(3000);
+    z_axis.writeMicroseconds(Z_STOP);
+  //  MotorMove(Z_MOTOR, 0, 0);
     grip.write(GRIP_OPEN);
     delay(MOTOR_TIMEOUT);
     grip.write(GRIP_CLOSE);
     delay(MOTOR_TIMEOUT);
+    z_axis.writeMicroseconds(Z_UP);
+    delay(3000);
+    /*
     while(!reachlimit(LZ))
     {
       MotorMove(Z_MOTOR, 1, GRIP_SPEED);
       delay(1000);
-    }
-    MotorMove(Z_MOTOR, 0, 0);
+    } */
+    z_axis.writeMicroseconds(Z_STOP);
+    // MotorMove(Z_MOTOR, 0, 0);
     gohome(X_MOTOR, Y_MOTOR, GRIP_PIN, LX_M, LY_P);
     gamecoin--;
     digitalWrite(COMM_OUT, HIGH);
