@@ -133,19 +133,21 @@ void loop()
 
   if(reachlimit(BTN))
   {
-    z_axis.writeMicroseconds(Z_DOWN);
     MotorMove(X_MOTOR, 0, MOTOR_SPEED);
     MotorMove(Y_MOTOR, 0, MOTOR_SPEED);
   //  MotorMove(Z_MOTOR, -1, GRIP_SPEED);
-    delay(3000);
     z_axis.writeMicroseconds(Z_STOP);
   //  MotorMove(Z_MOTOR, 0, 0);
     grip.write(GRIP_OPEN);
     delay(MOTOR_TIMEOUT);
+    z_axis.writeMicroseconds(Z_DOWN);
+    delay(2000);
+    z_axis.writeMicroseconds(Z_STOP);
+    delay(500);
     grip.write(GRIP_CLOSE);
     delay(MOTOR_TIMEOUT);
     z_axis.writeMicroseconds(Z_UP);
-    delay(3000);
+    delay(2000);
     /*
     while(!reachlimit(LZ))
     {
