@@ -1,5 +1,7 @@
 # Firmware
-최종 사용 코드 : `ard_nano.ino`, `mega.ino`
+- 최종 사용 코드 : `ard_nano.ino`, `mega.ino`
+- 중간중간에 요소들 테스트는 `./test_elements` 폴더 속 파일들을 이용.
+- 참고로 못 쓰게 된 핀도 많으니까 유의해서 코드 보기.
 
 ## Arduino nano
 ### Distance Sensing
