@@ -29,8 +29,8 @@ const int MOTOR_SPEED = 255;  // 모터 속도 (0-255)
 const int GRIP_SPEED = 220;  // z축 모터 속도 (0-255)
 const unsigned long MOTOR_TIMEOUT = 1000;  // 모터 타임아웃 (ms)
 const int GRIP_OPEN = 1000; // 그리퍼 열림 값
-const int GRIP_CLOSE = 2000; // 그리퍼 닫는 값
- const int GRIP_STOP = 1500; // 그리퍼 멈춤 
+const int GRIP_CLOSE = 1900; // 그리퍼 닫는 값
+ const int GRIP_STOP = 1450; // 그리퍼 멈춤
 const int Z_DOWN = 1900;
 const int Z_UP = 1000;
 const int Z_STOP = 1450;
@@ -89,14 +89,17 @@ void gohome(const int x_axis_motor[3], const int y_axis_motor[3], const int grip
   }
   MotorMove(x_axis_motor, 0, 0);
   MotorMove(y_axis_motor, 0, 0);
-  grip.writeMicroseconds(GRIP_OPEN); // open
-  delay(MOTOR_TIMEOUT);
-  grip.writeMicroseconds(GRIP_STOP);
-  delay(MOTOR_TIMEOUT);
-  grip.writeMicroseconds(GRIP_CLOSE); // close
-  delay(MOTOR_TIMEOUT);
-  grip.writeMicroseconds(GRIP_STOP);
-  delay(MOTOR_TIMEOUT);
+  if(gamecoin > 0)
+  {
+    grip.writeMicroseconds(GRIP_OPEN); // open
+    delay(MOTOR_TIMEOUT);
+    grip.writeMicroseconds(GRIP_STOP);
+    delay(MOTOR_TIMEOUT);
+    grip.writeMicroseconds(GRIP_CLOSE); // close
+    delay(MOTOR_TIMEOUT);
+    grip.writeMicroseconds(GRIP_STOP);
+    delay(MOTOR_TIMEOUT);
+  }
 }
 
 void setup()
