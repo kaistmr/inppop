@@ -135,7 +135,7 @@ void setup()
 
   reset();
   delay(1000);
-  volumeset(1);
+  volumeset(10);
 }
 
 int rxpoint = 0;

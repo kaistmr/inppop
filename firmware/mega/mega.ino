@@ -25,11 +25,12 @@ const int COMM_OUT = 5;
 const int COMM_IN = 2;
 
 // 모터 제어
-const int MOTOR_SPEED = 200;  // 모터 속도 (0-255)
+const int MOTOR_SPEED = 255;  // 모터 속도 (0-255)
 const int GRIP_SPEED = 220;  // z축 모터 속도 (0-255)
-const unsigned long MOTOR_TIMEOUT = 5000;  // 모터 타임아웃 (ms)
-const int GRIP_OPEN = 80; // 그리퍼 열림 값
-const int GRIP_CLOSE = 100; // 그리퍼 닫는 값
+const unsigned long MOTOR_TIMEOUT = 1000;  // 모터 타임아웃 (ms)
+const int GRIP_OPEN = 1000; // 그리퍼 열림 값
+const int GRIP_CLOSE = 2000; // 그리퍼 닫는 값
+ const int GRIP_STOP = 1500; // 그리퍼 멈춤 
 const int Z_DOWN = 1900;
 const int Z_UP = 1000;
 const int Z_STOP = 1450;
@@ -88,9 +89,14 @@ void gohome(const int x_axis_motor[3], const int y_axis_motor[3], const int grip
   }
   MotorMove(x_axis_motor, 0, 0);
   MotorMove(y_axis_motor, 0, 0);
-  grip.write(GRIP_OPEN); // open
-  delay(2000);
-  grip.write(GRIP_CLOSE); // close
+  grip.writeMicroseconds(GRIP_OPEN); // open
+  delay(MOTOR_TIMEOUT);
+  grip.writeMicroseconds(GRIP_STOP);
+  delay(MOTOR_TIMEOUT);
+  grip.writeMicroseconds(GRIP_CLOSE); // close
+  delay(MOTOR_TIMEOUT);
+  grip.writeMicroseconds(GRIP_STOP);
+  delay(MOTOR_TIMEOUT);
 }
 
 void setup()
@@ -118,8 +124,15 @@ void setup()
   pinMode(COMM_OUT, OUTPUT);
   pinMode(COMM_IN, INPUT);
 
-  grip.write(GRIP_CLOSE);
-  z_axis.write(Z_STOP);
+  grip.writeMicroseconds(GRIP_OPEN); // open
+  delay(MOTOR_TIMEOUT);
+  grip.writeMicroseconds(GRIP_STOP);
+  delay(MOTOR_TIMEOUT);
+  grip.writeMicroseconds(GRIP_CLOSE); // close
+  delay(MOTOR_TIMEOUT);
+  grip.writeMicroseconds(GRIP_STOP);
+  delay(MOTOR_TIMEOUT);
+  z_axis.writeMicroseconds(Z_STOP);
   delay(5000);
   gamecoin = 0;
 }
@@ -138,13 +151,17 @@ void loop()
   //  MotorMove(Z_MOTOR, -1, GRIP_SPEED);
     z_axis.writeMicroseconds(Z_STOP);
   //  MotorMove(Z_MOTOR, 0, 0);
-    grip.write(GRIP_OPEN);
+    grip.writeMicroseconds(GRIP_OPEN);
+    delay(MOTOR_TIMEOUT);
+    grip.writeMicroseconds(GRIP_STOP);
     delay(MOTOR_TIMEOUT);
     z_axis.writeMicroseconds(Z_DOWN);
     delay(2000);
     z_axis.writeMicroseconds(Z_STOP);
     delay(500);
-    grip.write(GRIP_CLOSE);
+    grip.writeMicroseconds(GRIP_CLOSE);
+    delay(MOTOR_TIMEOUT);
+    grip.writeMicroseconds(GRIP_STOP);
     delay(MOTOR_TIMEOUT);
     z_axis.writeMicroseconds(Z_UP);
     delay(2000);
